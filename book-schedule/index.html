@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giải Toán Chia Sách (Book Allocation)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: '#3b82f6',
+              secondary: '#1e293b',
+              accent: '#f59e0b',
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      /* Custom scrollbar for better aesthetics */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.5s ease-out forwards;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useCallback, useEffect } = React;
+
+        // --- ICONS (SVG Components) ---
+        const Icons = {
+            Calculator: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+            ),
+            AlertCircle: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+            ),
+            CheckCircle2: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            ),
+            RefreshCw: ({ className }) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            ),
+            BookOpen: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            ),
+            ChevronDown: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            ),
+            ChevronUp: () => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+            )
+        };
+
+        // --- ALGORITHMS ---
+        
+        // Kiểm tra xem có thể chia sách sao cho không ai nhận quá maxPages không
+        const isPossible = (arr, n, k, maxPages) => {
+            let studentsRequired = 1;
+            let currentSum = 0;
+
+            for (let i = 0; i < n; i++) {
+                if (arr[i] > maxPages) return false;
+
+                if (currentSum + arr[i] > maxPages) {
+                    studentsRequired++;
+                    currentSum = arr[i];
+
+                    if (studentsRequired > k) return false;
+                } else {
+                    currentSum += arr[i];
+                }
+            }
+            return true;
+        };
+
+        // Tìm kiếm nhị phân trên kết quả
+        const findMinMaxPages = (arr, k) => {
+            const n = arr.length;
+            if (n < k) return -1;
+
+            let sum = 0;
+            let maxVal = 0;
+            
+            for (let i = 0; i < n; i++) {
+                sum += arr[i];
+                if (arr[i] > maxVal) maxVal = arr[i];
+            }
+
+            let low = maxVal;
+            let high = sum;
+            let result = -1;
+
+            while (low <= high) {
+                const mid = Math.floor((low + high) / 2);
+
+                if (isPossible(arr, n, k, mid)) {
+                    result = mid;
+                    high = mid - 1;
+                } else {
+                    low = mid + 1;
+                }
+            }
+
+            return result;
+        };
+
+        // --- COMPONENTS ---
+
+        const ProblemDescription = () => {
+            const [isOpen, setIsOpen] = useState(false);
+
+            return (
+                <div className="w-full max-w-3xl mx-auto mb-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <button
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+                    >
+                        <div className="flex items-center gap-2 text-slate-800 font-semibold">
+                            <span className="text-primary"><Icons.BookOpen /></span>
+                            <span>Mô tả đề bài (Nhấn để xem)</span>
+                        </div>
+                        <span className="text-slate-500">
+                            {isOpen ? <Icons.ChevronUp /> : <Icons.ChevronDown />}
+                        </span>
+                    </button>
+
+                    {isOpen && (
+                        <div className="p-6 text-slate-600 space-y-4 text-sm leading-relaxed border-t border-slate-200">
+                            <p>
+                                <strong className="text-slate-900 block mb-1">Bài toán Chia Sách (Book Allocation)</strong>
+                                Cho một mảng <code className="bg-slate-100 px-1 py-0.5 rounded text-pink-600 font-mono">arr[]</code> và một số nguyên <code className="bg-slate-100 px-1 py-0.5 rounded text-pink-600 font-mono">k</code>. Trong đó, <code className="bg-slate-100 px-1 py-0.5 rounded text-pink-600 font-mono">arr[i]</code> biểu thị số trang của quyển sách thứ i, và <code className="bg-slate-100 px-1 py-0.5 rounded text-pink-600 font-mono">k</code> là tổng số học sinh.
+                            </p>
+                            <p>
+                                Tất cả các cuốn sách cần được chia cho <code className="bg-slate-100 px-1 py-0.5 rounded text-pink-600 font-mono">k</code> học sinh theo thứ tự <strong>liên tiếp</strong> (contiguous), sao cho mỗi học sinh nhận được ít nhất một cuốn sách.
+                            </p>
+                            <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+                                <p className="font-medium text-blue-900">Nhiệm vụ:</p>
+                                <p className="text-blue-800">Hãy tìm cách chia sao cho <strong>số trang sách tối đa</strong> mà một học sinh phải đọc là <strong>nhỏ nhất</strong> có thể. Nếu không thể chia sách cho tất cả học sinh, trả về -1.</p>
+                            </div>
+                            <div>
+                                <p className="font-semibold text-slate-900 mb-2">Ví dụ:</p>
+                                <div className="bg-slate-900 text-slate-50 p-3 rounded-lg font-mono text-xs">
+                                    <p>Input: 12 34 67 90</p>
+                                    <p>Học sinh (k): 2</p>
+                                    <p className="text-green-400 mt-1">Output: 113</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const MAX_N = 10000;
+        const MAX_K = 500;
+
+        const App = () => {
+            const [arrayInput, setArrayInput] = useState('12 34 67 90');
+            const [kInput, setKInput] = useState('2');
+            const [result, setResult] = useState(null);
+            const [error, setError] = useState(null);
+            const [isSolving, setIsSolving] = useState(false);
+
+            const handleSolve = useCallback(() => {
+                setIsSolving(true);
+                setResult(null);
+                setError(null);
+
+                // Giả lập độ trễ nhỏ để UI hiển thị trạng thái đang tính
+                setTimeout(() => {
+                    try {
+                        // 1. Xử lý Input Mảng
+                        const cleanedArrayInput = arrayInput.trim();
+                        if (!cleanedArrayInput) {
+                            throw new Error("Vui lòng nhập dữ liệu sách.");
+                        }
+
+                        // Tách chuỗi bằng khoảng trắng, dấu phẩy hoặc xuống dòng
+                        const arr = cleanedArrayInput.split(/[\s,]+/).map(numStr => {
+                            if (numStr === "") return -1; 
+                            const val = Number(numStr);
+                            if (isNaN(val) || val < 0) throw new Error(`Giá trị "${numStr}" không hợp lệ. Hãy nhập số nguyên dương.`);
+                            return val;
+                        }).filter(val => val !== -1);
+
+                        if (arr.length === 0) throw new Error("Vui lòng nhập ít nhất một cuốn sách.");
+
+                        // 2. Xử lý K
+                        const k = Number(kInput);
+                        if (isNaN(k) || k <= 0) {
+                            throw new Error("Số lượng học sinh (k) không hợp lệ. Hãy nhập số nguyên dương.");
+                        }
+
+                        // 3. Kiểm tra ràng buộc
+                        if (arr.length > MAX_N) {
+                            throw new Error(`Số lượng sách quá lớn (n = ${arr.length}). Giới hạn tối đa là ${MAX_N}.`);
+                        }
+                        if (k > MAX_K) {
+                            throw new Error(`Số lượng học sinh quá lớn (k = ${k}). Giới hạn tối đa là ${MAX_K}.`);
+                        }
+                        if (arr.length < k) {
+                            throw new Error(`Không đủ sách để chia cho mỗi học sinh ít nhất một quyển (n < k).`);
+                        }
+
+                        // 4. Giải bài toán
+                        const minMaxPages = findMinMaxPages(arr, k);
+                        setResult(minMaxPages);
+
+                    } catch (err) {
+                        setError(err.message || "Nhập số không hợp lệ");
+                    } finally {
+                        setIsSolving(false);
+                    }
+                }, 300);
+            }, [arrayInput, kInput]);
+
+            return (
+                <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
+                    <div className="max-w-4xl mx-auto">
+                        
+                        {/* Header */}
+                        <div className="text-center mb-10">
+                            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                                Giải Toán Chia Sách
+                            </h1>
+                            <p className="mt-3 text-lg text-slate-600">
+                                Tối ưu hóa việc phân bổ sách để giảm thiểu số trang đọc tối đa.
+                            </p>
+                            <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                                Thuật toán: Binary Search - O(N log(Sum))
+                            </div>
+                        </div>
+
+                        <ProblemDescription />
+
+                        {/* Main Input Card */}
+                        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                            <div className="p-6 sm:p-8 space-y-6">
+                                
+                                {/* Array Input */}
+                                <div>
+                                    <label htmlFor="arrayInput" className="block text-sm font-medium text-slate-700 mb-2">
+                                        Nhập số trang các cuốn sách (Mảng arr)
+                                    </label>
+                                    <div className="relative">
+                                        <textarea
+                                            id="arrayInput"
+                                            rows="3"
+                                            className="block w-full rounded-lg border-slate-300 bg-slate-50 p-3 text-slate-900 focus:border-blue-500 focus:ring-blue-500 sm:text-sm font-mono shadow-sm transition-all border outline-none"
+                                            placeholder="Ví dụ: 12 34 67 90"
+                                            value={arrayInput}
+                                            onChange={(e) => setArrayInput(e.target.value)}
+                                        />
+                                        <div className="absolute top-2 right-2 text-xs text-slate-400">
+                                            Số lượng: {arrayInput.trim() ? arrayInput.trim().split(/[\s,]+/).filter(x => x).length : 0}
+                                        </div>
+                                    </div>
+                                    <p className="mt-1 text-xs text-slate-500">Phân cách các số bởi khoảng trắng, dấu phẩy hoặc xuống dòng.</p>
+                                </div>
+
+                                {/* K Input */}
+                                <div>
+                                    <label htmlFor="kInput" className="block text-sm font-medium text-slate-700 mb-2">
+                                        Số lượng học sinh (k)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        id="kInput"
+                                        className="block w-full sm:w-1/3 rounded-lg border-slate-300 bg-slate-50 p-3 text-slate-900 focus:border-blue-500 focus:ring-blue-500 sm:text-sm font-mono shadow-sm transition-all border outline-none"
+                                        placeholder="Ví dụ: 2"
+                                        value={kInput}
+                                        onChange={(e) => setKInput(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Action Button */}
+                                <div className="pt-2">
+                                    <button
+                                        onClick={handleSolve}
+                                        disabled={isSolving}
+                                        className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        {isSolving ? (
+                                            <Icons.RefreshCw className="animate-spin h-5 w-5" />
+                                        ) : (
+                                            <Icons.Calculator />
+                                        )}
+                                        {isSolving ? 'Đang tính toán...' : 'Tính Kết Quả'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Error Message */}
+                            {error && (
+                                <div className="bg-red-50 border-t border-red-100 p-4 animate-fadeIn">
+                                    <div className="flex items-start">
+                                        <div className="text-red-500 mt-0.5"><Icons.AlertCircle /></div>
+                                        <div className="ml-3">
+                                            <h3 className="text-sm font-medium text-red-800">Lỗi nhập liệu</h3>
+                                            <div className="mt-1 text-sm text-red-700">{error}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Results Area */}
+                            {result !== null && !error && (
+                                <div className="bg-slate-900 border-t border-slate-800 p-6 sm:p-8 animate-fadeIn">
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                                        
+                                        <div className="text-center sm:text-left">
+                                            <p className="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">Kết quả tối ưu (Min-Max)</p>
+                                            <div className="flex items-baseline gap-2 justify-center sm:justify-start">
+                                                <span className="text-5xl font-bold text-white tracking-tighter">{result}</span>
+                                                <span className="text-slate-500 text-sm">trang</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 text-green-400 bg-green-400/10 px-4 py-2 rounded-full border border-green-400/20">
+                                            <Icons.CheckCircle2 />
+                                            <span className="text-sm font-medium">Chia thành công</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="mt-12 text-center text-slate-400 text-sm">
+                            <p>Độ phức tạp thuật toán: O(N * log(Sum))</p>
+                            <p>Giới hạn hệ thống: N ≤ {MAX_N}, K ≤ {MAX_K}</p>
+                            <p className="mt-4 text-xs text-slate-500">Mã nguồn mở | Chạy trực tiếp trên GitHub Pages</p>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
